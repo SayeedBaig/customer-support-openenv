@@ -7,7 +7,8 @@ class Observation(BaseModel):
     issue_type: str
     order_status: str
     attempts: int
-
+    reward: float
+    done: bool
 
 # Action Model (required for your task)
 class Action(BaseModel):
