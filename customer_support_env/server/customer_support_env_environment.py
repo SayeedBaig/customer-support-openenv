@@ -81,20 +81,52 @@ class CustomerSupportEnvironment(Environment):
         """
         self._state.step_count += 1
 
-        message = action.message
-        length = len(message)
+        action_type = action.action  # action comes as string
 
-        # Simple reward: longer messages get higher rewards
-        reward = length * 0.1
+        # increment attempts
+        self._current_obs.attempts += 1
 
+        reward = 0.0
+        done = False
+
+        # -------- ACTION LOGIC --------
+        if action_type == "apologize":
+            self._current_obs.sentiment = "calmer"
+            reward = 1.0
+
+        elif action_type == "refund":
+            if self._current_obs.issue_type == "delayed_order":
+                self._current_obs.order_status = "refunded"
+                reward = 5.0
+                done = True
+            else:
+                reward = -1.0
+
+        elif action_type == "track_order":
+            reward = 2.0
+            self._current_obs.sentiment = "neutral"
+
+        elif action_type == "ignore":
+            self._current_obs.sentiment = "angry"
+            reward = -2.0
+
+        else:
+            reward = -1.0
+
+        # -------- DONE CONDITION --------
+        if self._current_obs.attempts >= 3:
+            done = True
+
+        # -------- RETURN UPDATED OBS --------
         return CustomerSupportObservation(
-            echoed_message=message,
-            message_length=length,
-            done=False,
+            user_query=self._current_obs.user_query,
+            sentiment=self._current_obs.sentiment,
+            issue_type=self._current_obs.issue_type,
+            order_status=self._current_obs.order_status,
+            attempts=self._current_obs.attempts,
             reward=reward,
-            metadata={"original_message": message, "step": self._state.step_count},
+            done=done,
         )
-
     @property
     def state(self) -> State:
         """
