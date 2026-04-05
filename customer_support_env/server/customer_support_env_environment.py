@@ -21,6 +21,7 @@ try:
 except ImportError:
     from models import CustomerSupportAction, CustomerSupportObservation
 
+from ..task_env.tasks import easy_task, medium_task, hard_task
 
 class CustomerSupportEnvironment(Environment):
     """
@@ -50,8 +51,10 @@ class CustomerSupportEnvironment(Environment):
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._reset_count = 0
         self._current_obs = None
+        self._current_task = None
+        self._actions_taken = []
 
-    def reset(self) -> CustomerSupportObservation:
+    def reset(self, task="easy") -> CustomerSupportObservation:
         """
         Reset the environment.
 
@@ -60,15 +63,22 @@ class CustomerSupportEnvironment(Environment):
         """
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._reset_count += 1
-        self._current_obs = CustomerSupportObservation(
-            user_query="My order has not arrived yet",
-            sentiment="frustrated",
-            issue_type="delayed_order",
-            order_status="shipped",
-            attempts=0,
-            reward=0.0,      # ✅ ADD THIS
-            done=False       # ✅ ADD THIS
-        )
+        self._actions_taken = []
+
+        if task == "easy":
+            self._current_task = easy_task
+        elif task == "medium":
+            self._current_task = medium_task
+        elif task == "hard":
+            self._current_task = hard_task
+        else:
+            raise ValueError(f"Unknown task: {task}. Choose easy, medium or hard.")
+            self._current_obs = CustomerSupportObservation(
+                **self._current_task.initial_state,
+                reward=0.0,
+                done=False
+            )
+            
         return self._current_obs
 
     def step(self, action: CustomerSupportAction) -> CustomerSupportObservation:
