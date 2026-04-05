@@ -15,9 +15,10 @@ class Action(BaseModel):
     action: str
 
 
-# 🔥 Aliases for OpenEnv compatibility
+#  Aliases for OpenEnv compatibility
 class CustomerSupportObservation(Observation):
-    pass
+    reward:float =0.0
+    done:bool = False
 
 
 class CustomerSupportAction(Action):
