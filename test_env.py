@@ -14,8 +14,9 @@ print("\n---- MEDIUM TASK ----")
 obs = env.reset(task="medium")
 print(obs)
 
-obs, reward, done, _ = env.step("apologize")
-print("Reward:", reward, "Done:", done)
+for action in ["apologize", "apologize", "track_order", "refund"]:
+    obs, reward, done, _ = env.step(action)
+    print(f"Action: {action} | Reward: {reward} | Done: {done}")
 
 
 print("\n---- HARD TASK ----")

@@ -11,13 +11,18 @@ class CustomerSupportTask:
 
 
 class EasyRefundTask(CustomerSupportTask):
-    def evaluate(self, action) -> float:
+    def evaluate(self, action_history) -> float:
+        if isinstance(action_history, list):
+            latest_action = action_history[-1] if action_history else None
+        else:
+            latest_action = action_history
+
         # Best outcome: the agent issues the refund.
-        if action == "refund":
+        if latest_action == "refund":
             return 1.0
 
         # Partial credit: the agent acknowledges the issue politely.
-        if action == "apologize":
+        if latest_action == "apologize":
             return 0.5
 
         # No useful resolution was provided.
@@ -83,44 +88,28 @@ class MediumDelayedOrderTask(CustomerSupportTask):
         )
     
     def evaluate(self, actions_taken: list) -> float:
-        required_actions = ["apologize", "provide_status_update"]
-        optional_actions = ["give_discount"]
-
-        completed_required_actions = all(
+        required_actions = ["apologize", "track_order"]
+        has_all_required_actions = all(
             action in actions_taken for action in required_actions
         )
-        completed_optional_action = any(
-            action in actions_taken for action in optional_actions
-        )
-        completed_any_required_action = any(
+        has_refund = "refund" in actions_taken
+        has_any_required_action = any(
             action in actions_taken for action in required_actions
         )
 
-        # Full credit: all required actions were taken and a discount was offered.
-        if completed_required_actions and completed_optional_action:
+        # Full credit: the agent completed the required support steps and issued a refund.
+        if has_all_required_actions and has_refund:
             return 1.0
 
-        # Strong resolution: required support steps were completed.
-        if completed_required_actions:
+        # Strong partial progress: the agent completed the required support steps.
+        if has_all_required_actions and not has_refund:
             return 0.8
 
-        # Basic partial progress: at least one required step was taken.
-        if completed_any_required_action and not completed_optional_action:
+        # Partial credit: at least one of the required actions was taken.
+        if has_any_required_action:
             return 0.5
 
-        # Slightly better partial progress: one required step plus discount.
-        if completed_any_required_action and completed_optional_action:
-            return 0.6
-
-        # Minimal credit: only the optional discount was offered.
-        if completed_optional_action and not completed_any_required_action:
-            return 0.1
-
-        # No progress or irrelevant actions.
-        if not actions_taken:
-            return 0.0
-
-        # Fallback for unsupported action combinations.
+        # Irrelevant or incorrect actions do not receive credit.
         return 0.0
 
 

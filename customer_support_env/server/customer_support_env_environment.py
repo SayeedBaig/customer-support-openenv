@@ -101,15 +101,30 @@ class CustomerSupportEnvironment(Environment):
             action_name = action
         else:
             action_name = action.action
+
+        last_action = self.action_history[-1] if self.action_history else None
+
         self.action_history.append(action_name)
 
-        if self._current_task is easy_task:
-            evaluation_input = action_name
-        else:
-            evaluation_input = self.action_history
+        base_score = self._current_task.evaluate(self.action_history)
 
-        reward = self._current_task.evaluate(evaluation_input)
-        done = reward == 1.0
+        repeated_action = last_action == action_name
+
+        # Recalculate reward fresh on every step from the current task progress.
+        reward = base_score
+
+        # Apply a fixed penalty for taking a step.
+        reward -= 0.05
+
+        # Discourage repeating the same action back-to-back.
+        if repeated_action:
+            reward -= 0.2
+
+        # Give a smaller success bonus when the task is fully completed.
+        if base_score == 1.0:
+            reward += 0.5
+
+        done = base_score == 1.0
 
         updated_sentiment = self._current_obs.sentiment
         updated_order_status = self._current_obs.order_status
@@ -131,6 +146,8 @@ class CustomerSupportEnvironment(Environment):
         info = {
             "task_goal": self._current_task.goal,
             "actions_taken": list(self.action_history),
+            "task_score": base_score,
+            "repeated_action": repeated_action,
         }
 
         return self._current_obs, reward, done, info
