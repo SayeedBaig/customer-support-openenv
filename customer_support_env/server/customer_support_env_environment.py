@@ -120,7 +120,6 @@ class CustomerSupportEnvironment(Environment):
             reward=reward,
             done=done,
         )
-
     @property
     def state(self) -> State:
         """
