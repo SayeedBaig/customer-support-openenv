@@ -47,6 +47,7 @@ class CustomerSupportEnvironment(Environment):
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
     VALID_ACTIONS = {
     "apologize",
+    "track_order",
     "provide_status_update",
     "refund",
     "offer_refund",
@@ -61,7 +62,8 @@ class CustomerSupportEnvironment(Environment):
         self._reset_count = 0
         self._current_obs = None
         self._current_task = None
-        self._actions_taken = []
+        self.action_history = []
+        self.wrong_action_count = 0
 
     def reset(self, task="easy") -> CustomerSupportObservation:
         """
@@ -73,6 +75,7 @@ class CustomerSupportEnvironment(Environment):
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._reset_count += 1
         self.action_history = []
+        self.wrong_action_count = 0
 
         if task == "easy":
             self._current_task = easy_task
@@ -98,8 +101,17 @@ class CustomerSupportEnvironment(Environment):
         self._state.step_count += 1
 
         action_name = action if isinstance(action, str) else action.action
+        self.action_history.append(action_name)
 
         prev_obs = self._current_obs
+        info = {
+            "task_goal": self._current_task.goal,
+            "actions_taken": self.action_history,
+            "task_score": 0.0,
+            "repeated_action": False,
+            "termination_reason": "in_progress",
+            "steps_taken": self._state.step_count,
+        }
 
         # -----------------------------
         # 1️⃣ ACTION VALIDATION
@@ -107,16 +119,15 @@ class CustomerSupportEnvironment(Environment):
         if action_name not in self.VALID_ACTIONS:
             reward = -0.2
             done = False
-
-            return self._current_obs, reward, done, {
-                "error": f"Invalid action: {action_name}"
-            }
+            info["actions_taken"] = self.action_history
+            info["termination_reason"] = "in_progress"
+            info["error"] = f"Invalid action: {action_name}"
+            return self._current_obs, reward, done, info
 
         # -----------------------------
         # 2️⃣ TRACK ACTION HISTORY
         # -----------------------------
-        last_action = self.action_history[-1] if self.action_history else None
-        self.action_history.append(action_name)
+        last_action = self.action_history[-2] if len(self.action_history) >= 2 else None
 
         repeated_action = last_action == action_name
 
@@ -130,7 +141,7 @@ class CustomerSupportEnvironment(Environment):
         # -----------------------------
         # 4️⃣ ACTION-LEVEL REWARD
         # -----------------------------
-        if action_name in {"apologize", "provide_status_update", "ask_info"}:
+        if action_name in {"apologize", "track_order", "provide_status_update", "ask_info"}:
             reward += 0.3
 
         elif action_name in {"refund", "offer_refund"}:
@@ -183,7 +194,7 @@ class CustomerSupportEnvironment(Environment):
             else:
                 updated_sentiment = "neutral"
 
-        elif action_name == "provide_status_update":
+        elif action_name in {"track_order", "provide_status_update"}:
             updated_order_status = "update_provided"
             if updated_sentiment == "frustrated":
                 updated_sentiment = "calmer"
@@ -203,24 +214,30 @@ class CustomerSupportEnvironment(Environment):
         task_completed = base_score == 1.0
         max_steps_reached = self._state.step_count >= MAX_STEPS
 
-        recent_actions = self.action_history[-3:]
-        repeated_wrong = (
-            len(recent_actions) == 3
-            and len(set(recent_actions)) == 1
-            and base_score == 0.0
-        )
+        if base_score == 0.0:
+            self.wrong_action_count += 1
+        else:
+            self.wrong_action_count = 0
+
+        repeated_wrong = self.wrong_action_count >= 3
+
+        if len(self.action_history) >= 3:
+            last_three_actions = self.action_history[-3:]
+            same_action_repeated = len(set(last_three_actions)) == 1
+            if same_action_repeated and base_score == 0.0:
+                repeated_wrong = True
 
         done = task_completed or max_steps_reached or repeated_wrong
 
-        termination_reason = (
-            "task_completed"
-            if task_completed
-            else "max_steps_reached"
-            if max_steps_reached
-            else "repeated_wrong_actions"
-            if repeated_wrong
-            else "in_progress"
-        )
+        if task_completed:
+            done = True
+            info["termination_reason"] = "task_completed"
+        elif repeated_wrong:
+            done = True
+            info["termination_reason"] = "repeated_wrong_actions"
+        elif max_steps_reached:
+            done = True
+            info["termination_reason"] = "max_steps_reached"
 
         # -----------------------------
         # 🔟 UPDATE OBS
@@ -240,14 +257,23 @@ class CustomerSupportEnvironment(Environment):
             and prev_obs.order_status == updated_order_status
         ):
             reward -= 0.1
-        info = {
-            "task_goal": self._current_task.goal,
-            "actions_taken": list(self.action_history),
-            "task_score": base_score,
-            "repeated_action": repeated_action,
-            "termination_reason": termination_reason,
-            "steps_taken": self._state.step_count,
-        }
+        info.update(
+            {
+                "task_goal": self._current_task.goal,
+                "actions_taken": self.action_history,
+                "task_score": base_score,
+                "repeated_action": repeated_action,
+                "steps_taken": self._state.step_count,
+                "termination_reason": info.get("termination_reason", "in_progress"),
+            }
+        )
+
+        if len(self.action_history) >= 3:
+            last_three = self.action_history[-3:]
+
+            if len(set(last_three)) == 1 and base_score == 0.0:
+                done = True
+                info["termination_reason"] = "repeated_wrong_actions"
 
         return self._current_obs, reward, done, info
     @property

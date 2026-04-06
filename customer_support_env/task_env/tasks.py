@@ -11,13 +11,22 @@ class CustomerSupportTask:
 
 
 class EasyRefundTask(CustomerSupportTask):
-    def evaluate(self, action) -> float:
-        if action == "refund":
-            return 1.0
-        elif  action == "apologize":
-            return 0.5
+    def evaluate(self, action_history) -> float:
+        if isinstance(action_history, list):
+            latest_action = action_history[-1] if action_history else None
         else:
-         return 0.0
+            latest_action = action_history
+
+        # Best outcome: the agent issues the refund.
+        if latest_action == "refund":
+            return 1.0
+
+        # Partial credit: the agent acknowledges the issue politely.
+        if latest_action == "apologize":
+            return 0.5
+
+        # No useful resolution was provided.
+        return 0.0
 
 
 easy_task = EasyRefundTask(
@@ -79,46 +88,45 @@ class MediumDelayedOrderTask(CustomerSupportTask):
         )
     
     def evaluate(self, actions_taken: list) -> float:
-        required = ["apologize", "provide_status_update"]
-        optional = ["give_discount"]
-        required_done = all(a in actions_taken for a in required)
-        optional_done = any(a in actions_taken for a in optional)
-        any_required_done = any(a in actions_taken for a in required)
-        if required_done and optional_done:
+        required_actions = ["apologize", "track_order"]
+        has_all_required_actions = all(
+            action in actions_taken for action in required_actions
+        )
+        has_refund = "refund" in actions_taken
+        has_any_required_action = any(
+            action in actions_taken for action in required_actions
+        )
+
+        # Full credit: required actions are present and the refund was issued.
+        if has_all_required_actions and has_refund:
             return 1.0
-        elif required_done:
+
+        # Strong partial progress: required actions are present without final resolution.
+        if has_all_required_actions and not has_refund:
             return 0.8
-        elif any_required_done and not optional_done:
+
+        # Partial credit: at least one of the required actions was taken.
+        if has_any_required_action:
             return 0.5
-        elif any_required_done and optional_done:
-            return 0.6
-        elif optional_done and not any_required_done:
-            return 0.1
-        elif not actions_taken:
-            return -0.5
-        else:
-            return -0.5
-# env/tasks.py
+
+        # Irrelevant or incorrect actions do not receive credit.
+        return 0.0
+
 
 class HardTask:
     def __init__(self):
+        self.goal = "Handle a multi-issue support case with a clear next step."
+        self.initial_state = {
+            "user_query": "I was charged twice and my replacement still has not arrived.",
+            "sentiment": "angry",
+            "issue_type": "billing_and_replacement",
+            "order_status": "processing",
+            "attempts": 2,
+        }
         self.reset()
 
     def reset(self):
-        self.state = {
-            "user_message": "My order is late AND I received the wrong item. This is unacceptable!",
-            "sentiment": "angry",
-            "issues": ["delayed_order", "wrong_item"],
-
-            # tracking flags
-            "apologized": False,
-            "acknowledged": False,
-            "resolution_offered": False,
-            "closed": False,
-
-            "steps_taken": [],
-            "resolved": False
-        }
+        self.state = self.initial_state.copy()
         return self.state
 
     def step(self, action: str):
@@ -150,6 +158,53 @@ class HardTask:
 
         return self.state
 
+    def evaluate(self, actions: list) -> float:
+        # Invalid input cannot receive credit.
+        if not isinstance(actions, list):
+            return 0.0
+
+        actions_taken = set(actions)
+
+        included_apology = "apologize" in actions_taken
+        included_investigation = (
+            "investigate" in actions_taken
+            or "acknowledge_issues" in actions_taken
+        )
+        included_refund = (
+            "refund" in actions_taken
+            or "offer_refund" in actions_taken
+        )
+        included_case_closure = "close_case" in actions_taken
+
+        # Full resolution: apologize, investigate, refund, and close the case.
+        if (
+            included_apology
+            and included_investigation
+            and included_refund
+            and included_case_closure
+        ):
+            return 1.0
+
+        # Strong progress: the issue was resolved, but the case was not closed.
+        if (
+            included_apology
+            and included_investigation
+            and included_refund
+            and not included_case_closure
+        ):
+            return 0.8
+
+        # Partial resolution: some meaningful resolution steps were taken.
+        if included_investigation or (included_apology and included_refund):
+            return 0.5
+
+        # Minimal progress: only an apology was provided.
+        if included_apology and not included_investigation and not included_refund:
+            return 0.2
+
+        # No meaningful support action was taken.
+        return 0.0
+
 
 # ------------------- GRADER -------------------
 
@@ -174,4 +229,7 @@ def hard_task_grader(state: dict) -> float:
         score += 0.2
 
     return round(min(score, 1.0), 2)
+
+
 medium_task = MediumDelayedOrderTask()
+hard_task = HardTask()
