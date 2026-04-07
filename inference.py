@@ -1,97 +1,70 @@
-import requests
 import os
-from customer_support_env.server.customer_support_env_environment import CustomerSupportEnvironment
+from openai import OpenAI
+from dotenv import load_dotenv
+from customer_support_env.server.customer_support_env_environment import (
+    CustomerSupportEnvironment,
+)
 
-API_URL = os.getenv('API_BASE_URL')
-MODEL_NAME=os.getenv('MODEL_NAME')
-headers = {
-    "Authorization": f"Bearer {os.getenv('HF_TOKEN')}",
-    "Content-Type": "application/json"
-}
+load_dotenv()
 
-VALID_ACTIONS = ["respond_to_user", "check_order_status", "issue_refund"]
+API_BASE_URL = os.getenv("API_BASE_URL")
+MODEL_NAME = os.getenv("MODEL_NAME")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
-def extract_text(obs):
-    try:
-        return obs.text.lower()
-    except:
-        return str(obs).lower()
-def get_action_from_llm(obs, history):
-    obs_text = extract_text(obs)
+client = OpenAI(
+    base_url=API_BASE_URL,
+    api_key=HF_TOKEN,
+)
 
-    prompt = f"""
-You are a customer support agent.
+VALID_ACTIONS = [
+    "apologize",
+    "refund",
+    "provide_status_update",
+    "escalate_to_human",
+    "give_discount",
+    "track_order",
+    "acknowledge_issues",
+    "close_case",
+]
 
-Choose the BEST action from:
-{VALID_ACTIONS}
+def get_action_from_llm(obs, action_history=[]) -> str:
+    prompt = f"""You are a customer support agent.
 
-ONLY return the action name.
+Current situation:
+- Customer query: {obs.user_query}
+- Customer sentiment: {obs.sentiment}
+- Issue type: {obs.issue_type}
+- Order status: {obs.order_status}
+- Attempts so far: {obs.attempts}
 
-Customer:
-{obs_text}
+Actions already taken: {action_history if action_history else "None"}
 
-History:
-{history}
+Choose ONE action from this list:
+{", ".join(VALID_ACTIONS)}
 
-Answer:
-"""
+Important: Do NOT repeat an action already taken.
+Reply with ONLY the action name. Nothing else."""
 
-    try:
-        response = requests.post(
-            API_URL,
-            headers=headers,
-            json={
-                "inputs": prompt,
-                "parameters": {"max_new_tokens": 20}
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {
+                "role": "system",
+                "content": """You are a customer support AI agent.
+You must reply with ONLY one word from this exact list:
+apologize, refund, provide_status_update, escalate_to_human, give_discount, track_order, acknowledge_issues, close_case
+
+No explanation. No sentence. Just one word."""
             },
-            timeout=15
-        )
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=10,
+    )
 
-        if response.status_code != 200:
-            print("HF ERROR:", response.text)
-            return smart_fallback(obs_text)
+    raw_output = response.choices[0].message.content.strip().lower()
+    return parse_action(raw_output)
 
-        try:
-            data = response.json()
-        except:
-            print("Invalid JSON:", response.text)
-            return smart_fallback(obs_text)
 
-        print("HF RAW:", data)
-
-        if isinstance(data, dict) and "error" in data:
-            print("HF API ERROR:", data["error"])
-            return smart_fallback(obs_text)
-
-        if isinstance(data, list) and "generated_text" in data[0]:
-            output = data[0]["generated_text"].lower()
-            return map_to_valid_action(output, obs_text)
-
-        return smart_fallback(obs_text)
-    except Exception as e:
-        print("LLM Error:", e)
-        return smart_fallback(obs_text)
-def map_to_valid_action(output, obs):
-    # LLM output mapping
-    if "refund" in output:
-        return "issue_refund"
-    elif "delay" in output or "late" in output or "status" in output:
-        return "check_order_status"
-    elif "respond" in output or "help" in output:
-        return "respond_to_user"
-
-    # fallback to rule-based
-    return smart_fallback(obs)
-def smart_fallback(obs):
-    obs = extract_text(obs)
-
-    if "refund" in obs:
-        return "issue_refund"
-    elif "late" in obs or "delay" in obs:
-        return "check_order_status"
-    else:
-        return "respond_to_user"
-    
 def parse_action(raw_output: str) -> str:
     for action in VALID_ACTIONS:
         if action in raw_output:
@@ -111,15 +84,15 @@ def parse_action(raw_output: str) -> str:
         return "acknowledge_issues"
     elif any(word in raw_output for word in ["close", "resolve", "done"]):
         return "close_case"
-    
+
     return "apologize"
 
+
+# Main
 env = CustomerSupportEnvironment()
 task = "medium"
 
-# -----------------------------
-# 🔹 START LOG (STRICT)
-# -----------------------------
+# START LOG
 print(f"[START] task={task} env=CustomerSupportEnvironment model={MODEL_NAME}")
 
 obs = env.reset(task=task)
@@ -128,28 +101,15 @@ total_reward = 0.0
 step = 0
 done = False
 
-# -----------------------------
-# 🔹 LOOP
-# -----------------------------
+# LOOP
 while not done and step < 10:
     step += 1
-
     action = get_action_from_llm(obs, env.action_history)
-
     obs, reward, done, info = env.step(action)
-
     total_reward += reward
 
-    # -----------------------------
-    # 🔹 STEP LOG (STRICT)
-    # -----------------------------
-    print(
-        f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()}"
-    )
+    # STEP LOG
+    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()}")
 
-# -----------------------------
-# 🔹 END LOG (STRICT)
-# -----------------------------
-print(
-    f"[END] success={str(done).lower()} steps={step} rewards={total_reward:.2f}"
-)
+# END LOG
+print(f"[END] success={str(done).lower()} steps={step} rewards={total_reward:.2f}")
