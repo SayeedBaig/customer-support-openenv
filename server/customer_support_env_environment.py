@@ -16,10 +16,8 @@ from uuid import uuid4
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
-try:
-    from ..customer_support_env.models import CustomerSupportAction, CustomerSupportObservation
-except ImportError:
-    from models import CustomerSupportAction, CustomerSupportObservation
+from models import CustomerSupportAction, CustomerSupportObservation
+from task_env.tasks import easy_task, medium_task, hard_task
 
 from ..task_env.tasks import easy_task, medium_task, hard_task
 MAX_STEPS = 10

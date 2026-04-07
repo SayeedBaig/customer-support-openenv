@@ -6,12 +6,8 @@ try:
 except Exception as e:
     raise ImportError("openenv is required") from e
 
-try:
-    from .customer_support_env.models import CustomerSupportAction, CustomerSupportObservation
-    from .server.customer_support_env_environment import CustomerSupportEnvironment
-except ModuleNotFoundError:
-    from models import CustomerSupportAction, CustomerSupportObservation
-    from server.customer_support_env_environment import CustomerSupportEnvironment
+from models import CustomerSupportAction, CustomerSupportObservation
+from server.customer_support_env_environment import CustomerSupportEnvironment
 
 
 # ----------- Create backend app -----------
