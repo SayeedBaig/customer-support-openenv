@@ -11,61 +11,23 @@ API_BASE_URL = os.getenv("API_BASE_URL")
 MODEL_NAME = os.getenv("MODEL_NAME")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
+import requests
 import os
-from openai import OpenAI
 
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
-VALID_ACTIONS = [
-    "apologize",
-    "refund",
-    "provide_status_update",
-    "escalate_to_human",
-    "give_discount",
-    "track_order",
-    "acknowledge_issues",
-    "close_case",
-]
+API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
 
-# Step 3 - Action generation
-def get_action_from_llm(obs, action_history=[]) -> str:
-    prompt = f"""You are a customer support agent. 
-Current situation:
-- Customer query: {obs.user_query}
-- Customer sentiment: {obs.sentiment}
-- Issue type: {obs.issue_type}
-- Order status: {obs.order_status}
-- Attempts so far: {obs.attempts}
+headers = {
+    "Authorization": f"Bearer {os.getenv('HF_TOKEN')}"
+}
 
-Actions already taken: {action_history if action_history else "None"}
+def get_action_from_llm(obs, history):
+    prompt = f"{obs}\nHistory: {history}\nWhat action should be taken?"
 
-Choose ONE action from this list:
-{", ".join(VALID_ACTIONS)}
+    response = requests.post(API_URL, headers=headers, json={
+        "inputs": prompt
+    })
 
-Reply with ONLY the action name. Nothing else.
-Important: Do NOT repeat an action already taken.
-Reply with ONLY the action name. Nothing else.
-"""
-
-    response = client.chat.completions.create(
-    model="gpt-4.1-mini",
-    messages=[
-        {
-            "role": "system", 
-            "content": """You are a customer support AI agent. 
-You must reply with ONLY one word from this exact list:
-apologize, refund, provide_status_update, escalate_to_human, give_discount, track_order, acknowledge_issues, close_case
-
-No explanation. No sentence. Just one word."""
-        },
-        {"role": "user", "content": prompt}
-    ],
-    max_tokens=10,
-)
-    raw_output = response.choices[0].message.content.strip().lower()
-    return parse_action(raw_output)
-
+    return response.json()
 
 def parse_action(raw_output: str) -> str:
     for action in VALID_ACTIONS:
