@@ -3,9 +3,7 @@ name: customer_support_env
 description: >
   A customer support RL environment where an AI agent resolves
   user issues through actions like refund, apologize, and escalate.
-
 entry_point: customer_support_env.server.customer_support_env_environment:CustomerSupportEnvironment
-
 observation_space:
   type: object
   properties:
@@ -19,7 +17,6 @@ observation_space:
       type: string
     attempts:
       type: integer
-
 action_space:
   type: string
   enum:
@@ -31,14 +28,16 @@ action_space:
     - track_order
     - acknowledge_issues
     - close_case
-
 tasks:
   easy:
     description: "User requests a refund. Agent must issue a refund."
     max_steps: 10
+    grader: task_env.tasks:easy_task
   medium:
     description: "Order is delayed. Agent must apologize and provide status update."
     max_steps: 10
+    grader: task_env.tasks:medium_task
   hard:
     description: "Angry user with multiple issues. Agent must apologize, investigate, refund and close case."
     max_steps: 10
+    grader: task_env.tasks:hard_task

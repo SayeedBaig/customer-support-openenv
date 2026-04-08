@@ -19,14 +19,14 @@ class EasyRefundTask(CustomerSupportTask):
 
         # Best outcome: the agent issues the refund.
         if latest_action == "refund":
-            return 1.0
+            return 0.9
 
         # Partial credit: the agent acknowledges the issue politely.
         if latest_action == "apologize":
             return 0.5
 
         # No useful resolution was provided.
-        return 0.0
+        return 0.1
 
 
 easy_task = EasyRefundTask(
@@ -99,18 +99,18 @@ class MediumDelayedOrderTask(CustomerSupportTask):
 
         # Full credit: required actions are present and the refund was issued.
         if has_all_required_actions and has_refund:
-            return 1.0
+            return 0.9
 
         # Strong partial progress: required actions are present without final resolution.
         if has_all_required_actions and not has_refund:
-            return 0.8
+            return 0.7
 
         # Partial credit: at least one of the required actions was taken.
         if has_any_required_action:
             return 0.5
 
         # Irrelevant or incorrect actions do not receive credit.
-        return 0.0
+        return 0.1
 
 
 class HardTask:
@@ -161,7 +161,7 @@ class HardTask:
     def evaluate(self, actions: list) -> float:
         # Invalid input cannot receive credit.
         if not isinstance(actions, list):
-            return 0.0
+            return 0.1
 
         actions_taken = set(actions)
 
@@ -183,7 +183,7 @@ class HardTask:
             and included_refund
             and included_case_closure
         ):
-            return 1.0
+            return 0.9
 
         # Strong progress: the issue was resolved, but the case was not closed.
         if (
@@ -192,7 +192,7 @@ class HardTask:
             and included_refund
             and not included_case_closure
         ):
-            return 0.8
+            return 0.7
 
         # Partial resolution: some meaningful resolution steps were taken.
         if included_investigation or (included_apology and included_refund):
@@ -203,7 +203,7 @@ class HardTask:
             return 0.2
 
         # No meaningful support action was taken.
-        return 0.0
+        return 0.1
 
 
 # ------------------- GRADER -------------------
@@ -228,7 +228,7 @@ def hard_task_grader(state: dict) -> float:
     if state.get("resolved"):
         score += 0.2
 
-    return round(min(score, 1.0), 2)
+    return max(round(min(score, 0.9), 2),0.1)
 
 
 medium_task = MediumDelayedOrderTask()
