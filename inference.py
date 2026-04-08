@@ -4,9 +4,9 @@ from server.customer_support_env_environment import (
     CustomerSupportEnvironment,
 )
 
-API_BASE_URL = os.environ.get("API_BASE_URL")
-MODEL_NAME = os.environ.get("MODEL_NAME")
-API_KEY = os.environ.get("API_KEY")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 VALID_ACTIONS = [
     "apologize",
@@ -24,17 +24,17 @@ FALLBACK_ACTION = "provide_status_update"
 
 def get_action_from_llm(obs, action_history=None) -> str:
     action_history = list(action_history or [])
-    api_base_url = os.environ.get("API_BASE_URL")
-    api_key = os.environ.get("API_KEY")
-    model = os.environ.get("MODEL_NAME") or "Qwen/Qwen2.5-7B-Instruct"
+    api_base_url = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+    hf_token = os.getenv("HF_TOKEN")
+    model = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
     
     print(f"[DEBUG] API_BASE_URL={api_base_url}")
-    print(f"[DEBUG] API_KEY={'set' if api_key else 'NOT SET'}")
+    print(f"[DEBUG] HF_TOKEN={'set' if hf_token else 'NOT SET'}")
     print(f"[DEBUG] MODEL_NAME={model}")
 
     client = OpenAI(
         base_url=api_base_url,
-        api_key=api_key,
+        api_key=hf_token,
     )
 
     prompt = f"""You are a customer support agent.
