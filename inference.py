@@ -29,6 +29,7 @@ FALLBACK_ACTION = "provide_status_update"
 
 def get_action_from_llm(obs, action_history=None) -> str:
     action_history = list(action_history or [])
+    model = MODEL_NAME or "Qwen/Qwen2.5-7B-Instruct"
     prompt = f"""You are a customer support agent.
 
 Current situation:
@@ -45,10 +46,6 @@ Choose ONE action from this list:
 
 Important: Do NOT repeat an action already taken.
 Reply with ONLY the action name. Nothing else."""
-
-    if not (API_BASE_URL and MODEL_NAME and API_KEY):
-        print("[WARN] Missing LLM configuration, using fallback rule-based action.")
-        return get_rule_based_action(obs, action_history)
 
     try:
         response = client.chat.completions.create(
@@ -128,27 +125,27 @@ try:
     env = CustomerSupportEnvironment()
     task = "medium"
 
-    # START LOG
     print(f"[START] task={task} env=CustomerSupportEnvironment model={MODEL_NAME}")
 
     obs = env.reset(task=task)
-
     total_reward = 0.0
     step = 0
     done = False
 
-    # LOOP
     while not done and step < 10:
         step += 1
-        action = get_action_from_llm(obs, env.action_history)
-        obs, reward, done, info = env.step(action)
-        total_reward += reward
+        try:
+            action = get_action_from_llm(obs, env.action_history)
+            obs, reward, done, info = env.step(action)
+            total_reward += reward
+            print(f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()}")
+        except Exception as exc:
+            print(f"[ERROR] Step {step} failed: {exc}")
+            action = "apologize"
+            obs, reward, done, info = env.step(action)
+            total_reward += reward  # ← add this
 
-        # STEP LOG
-        print(f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()}")
-
-    # END LOG
     print(f"[END] success={str(done).lower()} steps={step} rewards={total_reward:.2f}")
+
 except Exception as exc:
     print(f"[FATAL] inference.py failed: {exc}")
-    raise
