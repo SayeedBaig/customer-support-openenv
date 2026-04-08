@@ -10,6 +10,10 @@ COPY . /app
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user PATH=/home/user/.local/bin:$PATH
+
 # Prevent buffering
 ENV PYTHONUNBUFFERED=1
 
