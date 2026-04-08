@@ -10,7 +10,7 @@ API_KEY = os.environ.get("API_KEY")
 
 client = OpenAI(
     base_url=API_BASE_URL,
-    api_key=API_KEY,
+    api_key=API_KEY if API_KEY else "dummy-key",
 )
 
 VALID_ACTIONS = [
@@ -49,7 +49,7 @@ Reply with ONLY the action name. Nothing else."""
 
     try:
         response = client.chat.completions.create(
-            model=MODEL_NAME,
+            model=model,
             messages=[
                 {
                     "role": "system",
