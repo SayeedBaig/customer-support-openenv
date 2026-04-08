@@ -22,8 +22,8 @@ backend_app = create_app(
 # ----------- Create main FastAPI -----------
 app = FastAPI()
 
-# Mount backend at /api
-app.mount("/api", backend_app)
+
+app.mount("/", backend_app)
 
 # ----------- Gradio UI -----------
 def demo_response(text):
@@ -37,7 +37,7 @@ demo = gr.Interface(
 )
 
 # Mount UI at root
-app = gr.mount_gradio_app(app, demo, path="/")
+app = gr.mount_gradio_app(app, demo, path="/ui")
 
 
 # ----------- Health check -----------

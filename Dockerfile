@@ -12,7 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 RUN useradd -m -u 1000 user
 USER user
-ENV HOME=/home/user PATH=/home/user/.local/bin:$PATH
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1
 
 # Prevent buffering
 ENV PYTHONUNBUFFERED=1
@@ -21,4 +23,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 7860
 
 # Run inference script
-CMD ["uvicorn", "customer_support_env.server.app:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
