@@ -146,6 +146,18 @@ API Docs: https://revanthkumar9-customer-support-env.hf.space/docs
 
 ---
 
+## Baseline Scores
+
+| Task | Steps | Score | Success |
+|------|-------|-------|---------|
+| Easy | 10 | 0.100 | ❌ |
+| Medium | 10 | 0.500 | ✅ |
+| Hard | 10 | 0.900 | ✅ |
+
+Note: Scores vary due to stochastic LLM behavior. The hackathon proxy injects its own credentials so results may differ.
+
+---
+
 ## Tech Stack
 
 - Python 3.11
